@@ -1,44 +1,191 @@
-#include<stdio.h>
+#include <stdio.h>
+#include"converteutf832.h"
 
-int secundaria8p32(FILE* arquivo_entrada, FILE* arquivo_saida, int repeticoes);
+union u {
+	unsigned char c[4];
+	unsigned int i;
+};
+
+int secundaria8p32(int insere, FILE* arquivo_entrada, FILE* arquivo_saida, int repeticoes) {
+	unsigned char caractere;
+	for (int i = 0; i < repeticoes; i++) {
+		insere = insere << 8;
+		if (fread(&caractere, sizeof(unsigned char), 1, arquivo_entrada) != 1) {
+			fprintf(stderr, "Ocorreu um erro de leitura!\n");
+			return -1;
+		}
+		caractere = caractere << 2;
+		insere = insere | caractere;
+		insere = insere >> 2;
+	}
+	if (fwrite(&insere, sizeof(unsigned int), 1, arquivo_saida) != 1) {
+		fprintf(stderr, "Ocorreu um erro de gravacao!\n");
+		return -1;
+	}
+	else
+		return 0;
+}
 
 int convUtf8p32(FILE* arquivo_entrada, FILE* arquivo_saida) {
-	unsigned char caracter;
 	const unsigned int BOM = 0xfffe0000;
+	unsigned char caractere;
 	unsigned int insere;
-	int repeticoes;
+	int repeticoes = 0;
 
-	// Escreve BOM
 	fwrite(&BOM, sizeof(unsigned int), 1, arquivo_saida);
 
-	while (fread(&caracter, sizeof(unsigned char), 1, arquivo_entrada == 1) {
-
-		if (caracter <= 127)
+	while (fread(&caractere, sizeof(unsigned char), 1, arquivo_entrada) == 1) {
+		if (caractere <= 127)
 			repeticoes = 0;
 
-		else if (caracter <= 223) {
-			caracter = caracter << 3;
-			caracter = caracter >> 3;
+		else if (caractere <= 223) {
+			caractere = caractere << 3;
+			caractere = caractere >> 3;
 			repeticoes = 1;
 		}
 
-		else if (caracter <= 239) {
-			caracter = caracter << 4;
-			caracter = caracter >> 4;
+		else if (caractere <= 239) {
+			caractere = caractere << 4;
+			caractere = caractere >> 4;
 			repeticoes = 2;
 		}
 
-		else if (caracter <= 247) {
-			caracter = caracter << 5;
-			caracter = caracter >> 5;
+		else if (caractere <= 247) {
+			caractere = caractere << 5;
+			caractere = caractere >> 5;
 			repeticoes = 3;
 		}
 
-		fwrite(&caracter, sizeof(unsigned char), 1, arquivo_saida);
-
-		if (repeticoes > 0)
-			if (secundaria8p32(arquivo_entrada, arquivo_saida, repeticoes) == 0)
-				return 0; //erro na gravacao
+		insere = (unsigned int)caractere;
+		
+		if (secundaria8p32(insere, arquivo_entrada, arquivo_saida, repeticoes) == -1)
+			return -1;
 	}
 
+	if (feof(arquivo_entrada))
+		return 0;
+	else {
+		fprintf(stderr, "Ocorreu um erro de leitura!\n");
+		return -1;
+	}
+}
+
+
+
+
+int convUtf32p8(FILE* arquivo_entrada, FILE* arquiva_saida) {
+	unsigned int BOM;
+	union u inteiro;
+	unsigned char vchar[4];
+	unsigned char temp;
+	int repeticoes = 0;
+
+
+	
+	if (fread(&BOM, sizeof(unsigned int), 1, arquivo_entrada) != 1) {
+		fprintf(stderr, "Ocorreu um erro de leitura!\n");
+		return -1;
+	}
+
+
+
+	while (fread(vchar, sizeof(unsigned int), 1, arquivo_entrada) == 1) {
+		// Estruturar dado
+		if (BOM == 0xfeff)
+			for (int i = 0; i < 4; i++)
+				inteiro.c[i] = vchar[3 - i];
+		else if (BOM == 0xfffe0000)
+			for (int i = 0; i < 4; i++)
+				inteiro.c[i] = vchar[i];
+		else {
+			fprintf(stderr, "BOM inválido ou ausente!\n");
+			return -1;
+		}
+
+		// Identificar tipo
+		if (inteiro.i <= 0x7f) {
+			if (fwrite(inteiro.c[3], sizeof(unsigned char), 1, arquiva_saida) != 1) {
+				fprintf(stderr, "Ocorreu um erro de gravacao!\n");
+				return -1;
+			}
+
+			repeticoes = 0;
+		}
+
+		else if (inteiro.i <= 0x7ff) {
+			inteiro.c[2] = inteiro.c[2] << 2;
+			temp = inteiro.c[3] >> 6;
+			inteiro.c[2] = inteiro.c[2] | temp;
+			inteiro.c[2] = inteiro.c[2] | 0xc0;
+			if (fwrite(inteiro.c[2], sizeof(unsigned char), 1, arquiva_saida) != 1) {
+				fprintf(stderr, "Ocorreu um erro de gravacao!\n");
+				return -1;
+			}
+
+			repeticoes = 1;
+		}
+
+		else if (inteiro.i <= 0xffff) {
+			inteiro.c[1] = inteiro.c[2] >> 4;
+			inteiro.c[1] = inteiro.c[1] | 0xe0;
+			if (fwrite(inteiro.c[1], sizeof(unsigned char), 1, arquiva_saida) != 1) {
+				fprintf(stderr, "Ocorreu um erro de gravacao!\n");
+				return -1;
+			}
+
+			repeticoes = 2;
+		}
+
+		else if (inteiro.i <= 0x10ffff) {
+			// primeiro byte
+			inteiro.c[0] = inteiro.c[1] >> 2;
+			inteiro.c[0] = inteiro.c[0] | 0xf0;
+			if (fwrite(inteiro.c[0], sizeof(unsigned char), 1, arquiva_saida) != 1) {
+				fprintf(stderr, "Ocorreu um erro de gravacao!\n");
+				return -1;
+			}
+
+			// segundo byte
+			inteiro.c[1] = inteiro.c[1] << 6;
+			inteiro.c[1] = inteiro.c[1] >> 2;
+			temp = inteiro.c[2] >> 4;
+			inteiro.c[1] = inteiro.c[1] | temp;
+			inteiro.c[1] = inteiro.c[1] | 0x80;
+			if (fwrite(inteiro.c[1], sizeof(unsigned char), 1, arquiva_saida) != 1) {
+				fprintf(stderr, "Ocorreu um erro de gravacao!\n");
+				return -1;
+			}
+
+			repeticoes = 2;
+		}
+
+		if (repeticoes == 2) {
+			inteiro.c[2] = inteiro.c[2] << 4;
+			inteiro.c[2] = inteiro.c[2] >> 2;
+			temp = inteiro.c[3] >> 6;
+			inteiro.c[2] = inteiro.c[2] | temp;
+			inteiro.c[2] = inteiro.c[2] | 0x80;
+			if (fwrite(inteiro.c[2], sizeof(unsigned char), 1, arquiva_saida) != 1) {
+				fprintf(stderr, "Ocorreu um erro de gravacao!\n");
+				return -1;
+			}
+
+		}
+
+		if (repeticoes >= 1) {
+			inteiro.c[3] = inteiro.c[3] & 0x3f;
+			inteiro.c[3] = inteiro.c[3] | 0x80;
+			if (fwrite(inteiro.c[3], sizeof(unsigned char), 1, arquiva_saida) != 1) {
+				fprintf(stderr, "Ocorreu um erro de gravacao!\n");
+				return -1;
+			}
+		}
+
+	}
+	if (feof(arquivo_entrada))
+		return 0;
+	else {
+		fprintf(stderr, "Ocorreu um erro de leitura!\n");
+		return -1;
+	}
 }
