@@ -18,11 +18,11 @@ int main() {
 	FILE* arquivo_entrada2 = fopen("8p32.txt", "rb");
 	FILE* arquivo_saida2 = fopen("32p8.txt", "wb");
 
-	erro = convUtf8p32(arquivo_entrada, arquivo_saida);
+	erro = convUtf8p32(arquivo_entrada2, arquivo_saida2);
 	printf("%d\n", erro);
 
-	fclose(arquivo_entrada);
-	fclose(arquivo_saida);
+	fclose(arquivo_entrada2);
+	fclose(arquivo_saida2);
 
 	return 0;
 }
