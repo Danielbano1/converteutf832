@@ -27,7 +27,7 @@ int secundaria8p32(int insere, FILE* arquivo_entrada, FILE* arquivo_saida, int r
 }
 
 int convUtf8p32(FILE* arquivo_entrada, FILE* arquivo_saida) {
-	const unsigned int BOM = 0xfffe0000;
+	const unsigned int BOM = 0x0000feff;
 	unsigned char caractere;
 	unsigned int insere;
 	int repeticoes = 0;
