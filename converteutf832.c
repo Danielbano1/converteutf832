@@ -81,7 +81,7 @@ int convUtf32p8(FILE* arquivo_entrada, FILE* arquiva_saida) {
 	int repeticoes = 0;
 
 
-	
+
 	if (fread(&BOM, sizeof(unsigned int), 1, arquivo_entrada) != 1) {
 		fprintf(stderr, "Ocorreu um erro de leitura!\n");
 		return -1;
@@ -89,14 +89,18 @@ int convUtf32p8(FILE* arquivo_entrada, FILE* arquiva_saida) {
 
 
 
-	while (fread(vchar, sizeof(unsigned int), 1, arquivo_entrada) == 1) {
+	while (fread(vchar, sizeof(unsigned char), 4, arquivo_entrada) == 4) {
 		// Estruturar dado
-		if (BOM == 0xfeff)
+		if (BOM == 0xfffe0000) {    // big-endian
+			printf("big-endian");
 			for (int i = 0; i < 4; i++)
 				inteiro.c[i] = vchar[3 - i];
-		else if (BOM == 0xfffe0000)
-			for (int i = 0; i < 4; i++)
+		}
+		else if (BOM == 0xfeff) {   // little-endian     
+			printf("little-endian");					
+			for (int i = 0; i < 4; i++)					
 				inteiro.c[i] = vchar[i];
+		}
 		else {
 			fprintf(stderr, "BOM inválido ou ausente!\n");
 			return -1;
@@ -104,7 +108,7 @@ int convUtf32p8(FILE* arquivo_entrada, FILE* arquiva_saida) {
 
 		// Identificar tipo
 		if (inteiro.i <= 0x7f) {
-			if (fwrite(inteiro.c[3], sizeof(unsigned char), 1, arquiva_saida) != 1) {
+			if (fwrite(&inteiro.c[0], sizeof(unsigned char), 1, arquiva_saida) != 1) {
 				fprintf(stderr, "Ocorreu um erro de gravacao!\n");
 				return -1;
 			}
@@ -113,11 +117,11 @@ int convUtf32p8(FILE* arquivo_entrada, FILE* arquiva_saida) {
 		}
 
 		else if (inteiro.i <= 0x7ff) {
-			inteiro.c[2] = inteiro.c[2] << 2;
-			temp = inteiro.c[3] >> 6;
-			inteiro.c[2] = inteiro.c[2] | temp;
-			inteiro.c[2] = inteiro.c[2] | 0xc0;
-			if (fwrite(inteiro.c[2], sizeof(unsigned char), 1, arquiva_saida) != 1) {
+			inteiro.c[1] = inteiro.c[1] << 2;
+			temp = inteiro.c[0] >> 6;
+			inteiro.c[1] = inteiro.c[1] | temp;
+			inteiro.c[1] = inteiro.c[1] | 0xc0;
+			if (fwrite(&inteiro.c[1], sizeof(unsigned char), 1, arquiva_saida) != 1) {
 				fprintf(stderr, "Ocorreu um erro de gravacao!\n");
 				return -1;
 			}
@@ -126,9 +130,9 @@ int convUtf32p8(FILE* arquivo_entrada, FILE* arquiva_saida) {
 		}
 
 		else if (inteiro.i <= 0xffff) {
-			inteiro.c[1] = inteiro.c[2] >> 4;
-			inteiro.c[1] = inteiro.c[1] | 0xe0;
-			if (fwrite(inteiro.c[1], sizeof(unsigned char), 1, arquiva_saida) != 1) {
+			inteiro.c[2] = inteiro.c[1] >> 4;
+			inteiro.c[2] = inteiro.c[2] | 0xe0;
+			if (fwrite(&inteiro.c[2], sizeof(unsigned char), 1, arquiva_saida) != 1) {
 				fprintf(stderr, "Ocorreu um erro de gravacao!\n");
 				return -1;
 			}
@@ -138,20 +142,20 @@ int convUtf32p8(FILE* arquivo_entrada, FILE* arquiva_saida) {
 
 		else if (inteiro.i <= 0x10ffff) {
 			// primeiro byte
-			inteiro.c[0] = inteiro.c[1] >> 2;
-			inteiro.c[0] = inteiro.c[0] | 0xf0;
-			if (fwrite(inteiro.c[0], sizeof(unsigned char), 1, arquiva_saida) != 1) {
+			inteiro.c[3] = inteiro.c[2] >> 2;
+			inteiro.c[3] = inteiro.c[3] | 0xf0;
+			if (fwrite(&inteiro.c[3], sizeof(unsigned char), 1, arquiva_saida) != 1) {
 				fprintf(stderr, "Ocorreu um erro de gravacao!\n");
 				return -1;
 			}
 
 			// segundo byte
-			inteiro.c[1] = inteiro.c[1] << 6;
-			inteiro.c[1] = inteiro.c[1] >> 2;
-			temp = inteiro.c[2] >> 4;
-			inteiro.c[1] = inteiro.c[1] | temp;
-			inteiro.c[1] = inteiro.c[1] | 0x80;
-			if (fwrite(inteiro.c[1], sizeof(unsigned char), 1, arquiva_saida) != 1) {
+			inteiro.c[2] = inteiro.c[2] << 6;
+			inteiro.c[2] = inteiro.c[2] >> 2;
+			temp = inteiro.c[1] >> 4;
+			inteiro.c[2] = inteiro.c[2] | temp;
+			inteiro.c[2] = inteiro.c[2] | 0x80;
+			if (fwrite(&inteiro.c[2], sizeof(unsigned char), 1, arquiva_saida) != 1) {
 				fprintf(stderr, "Ocorreu um erro de gravacao!\n");
 				return -1;
 			}
@@ -160,12 +164,12 @@ int convUtf32p8(FILE* arquivo_entrada, FILE* arquiva_saida) {
 		}
 
 		if (repeticoes == 2) {
-			inteiro.c[2] = inteiro.c[2] << 4;
-			inteiro.c[2] = inteiro.c[2] >> 2;
-			temp = inteiro.c[3] >> 6;
-			inteiro.c[2] = inteiro.c[2] | temp;
-			inteiro.c[2] = inteiro.c[2] | 0x80;
-			if (fwrite(inteiro.c[2], sizeof(unsigned char), 1, arquiva_saida) != 1) {
+			inteiro.c[1] = inteiro.c[1] << 4;
+			inteiro.c[1] = inteiro.c[1] >> 2;
+			temp = inteiro.c[0] >> 6;
+			inteiro.c[1] = inteiro.c[1] | temp;
+			inteiro.c[1] = inteiro.c[1] | 0x80;
+			if (fwrite(&inteiro.c[1], sizeof(unsigned char), 1, arquiva_saida) != 1) {
 				fprintf(stderr, "Ocorreu um erro de gravacao!\n");
 				return -1;
 			}
@@ -173,14 +177,14 @@ int convUtf32p8(FILE* arquivo_entrada, FILE* arquiva_saida) {
 		}
 
 		if (repeticoes >= 1) {
-			inteiro.c[3] = inteiro.c[3] & 0x3f;
-			inteiro.c[3] = inteiro.c[3] | 0x80;
-			if (fwrite(inteiro.c[3], sizeof(unsigned char), 1, arquiva_saida) != 1) {
+			inteiro.c[0] = inteiro.c[0] & 0x3f;
+			inteiro.c[0] = inteiro.c[0] | 0x80;
+			if (fwrite(&inteiro.c[0], sizeof(unsigned char), 1, arquiva_saida) != 1) {
 				fprintf(stderr, "Ocorreu um erro de gravacao!\n");
 				return -1;
 			}
 		}
-
+		printf("%0x\n", inteiro.i);
 	}
 	if (feof(arquivo_entrada))
 		return 0;
